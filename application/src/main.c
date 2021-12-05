@@ -30,26 +30,15 @@
 #include "bsp/board.h"
 #include "tusb.h"
 
-#if TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3)
-  // ESP-IDF need "freertos/" prefix in include path.
-  // CFG_TUSB_OS_INC_PATH should be defined accordingly.
-  #include "freertos/FreeRTOS.h"
-  #include "freertos/semphr.h"
-  #include "freertos/queue.h"
-  #include "freertos/task.h"
-  #include "freertos/timers.h"
+// Include FreeRTOS
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "queue.h"
+#include "task.h"
+#include "timers.h"
 
-  #define USBD_STACK_SIZE     4096
-#else
-  #include "FreeRTOS.h"
-  #include "semphr.h"
-  #include "queue.h"
-  #include "task.h"
-  #include "timers.h"
-
-  // Increase stack size when debug log is enabled
-  #define USBD_STACK_SIZE    (3*configMINIMAL_STACK_SIZE/2) * (CFG_TUSB_DEBUG ? 2 : 1)
-#endif
+// Increase stack size when debug log is enabled
+#define USBD_STACK_SIZE    (3*configMINIMAL_STACK_SIZE/2) * (CFG_TUSB_DEBUG ? 2 : 1)
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
@@ -92,7 +81,7 @@ int main(void)
 {
   board_init();
 
-  // soft timer for blinky
+  // Create a soft timer for blinky
   blinky_tm = xTimerCreateStatic(NULL, pdMS_TO_TICKS(BLINK_NOT_MOUNTED), true, NULL, led_blinky_cb, &blinky_tmdef);
   xTimerStart(blinky_tm, 0);
 
@@ -102,20 +91,11 @@ int main(void)
   // Create CDC task
   (void) xTaskCreateStatic( cdc_task, "cdc", CDC_STACK_SZIE, NULL, configMAX_PRIORITIES-2, cdc_stack, &cdc_taskdef);
 
-  // skip starting scheduler (and return) for ESP32-S2 or ESP32-S3
-#if !TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3)
+  // Start scheduler
   vTaskStartScheduler();
-#endif
 
   return 0;
 }
-
-#if TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3)
-void app_main(void)
-{
-  main();
-}
-#endif
 
 // USB Device Driver task
 // This top level thread process all usb events and invoke callbacks
@@ -226,7 +206,7 @@ void tud_cdc_rx_cb(uint8_t itf)
 }
 
 //--------------------------------------------------------------------+
-// BLINKING TASK
+// BLINKING TASK (toggle led)
 //--------------------------------------------------------------------+
 void led_blinky_cb(TimerHandle_t xTimer)
 {
