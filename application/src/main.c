@@ -68,18 +68,17 @@ enum  {
 // static timer
 StaticTimer_t blinky_tmdef;
 TimerHandle_t blinky_tm;
+void led_blinky_cb(TimerHandle_t xTimer);
 
 // static task
 StackType_t  usb_device_stack[USBD_STACK_SIZE];
 StaticTask_t usb_device_taskdef;
+void usb_device_task(void* param);
 
 // static task for net
-#define NET_STACK_SZIE      configMINIMAL_STACK_SIZE
+#define NET_STACK_SZIE      configMINIMAL_STACK_SIZE*10
 StackType_t  net_stack[NET_STACK_SZIE];
 StaticTask_t net_taskdef;
-
-void led_blinky_cb(TimerHandle_t xTimer);
-void usb_device_task(void* param);
 void net_task(void* params);
 
 //--------------------------------------------------------------------+

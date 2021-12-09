@@ -76,7 +76,6 @@ SRC_C += \
   lib/lwip/src/apps/http/httpd.c \
   lib/lwip/src/apps/http/fs.c \
   lib/networking/dhserver.c \
-  lib/networking/dnserver.c \
   lib/networking/rndis_reports.c
   
 # Suppress FreeRTOS warnings
