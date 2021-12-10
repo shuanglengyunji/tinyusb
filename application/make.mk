@@ -18,10 +18,12 @@ __check_defined = \
 
 #-------------- Select the board to build for. ------------
 
-FAMILY_PATH = application/stm32f4
+BOARD = stm32f4
 
-include $(TOP)/$(FAMILY_PATH)/board.mk
-SRC_C += $(subst $(TOP)/,,$(wildcard $(TOP)/$(FAMILY_PATH)/*.c))
+include $(BOARD)/board.mk
+
+SRC_C += $(wildcard $(BOARD)/*.c)
+INC   += $(BOARD)
 
 # Fetch submodules depended by family
 fetch_submodule_if_empty = $(if $(wildcard $(TOP)/$1/*),,$(info $(shell git -C $(TOP) submodule update --init $1)))
@@ -52,8 +54,6 @@ else
 endif
 
 #-------------- Source files and compiler flags --------------
-
-INC   += $(TOP)/$(FAMILY_PATH)
 
 # Compiler Flags
 CFLAGS += \

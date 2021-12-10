@@ -4,7 +4,7 @@ DEPS_SUBMODULES += lib/CMSIS_5 hw/mcu/st/cmsis_device_$(ST_FAMILY) hw/mcu/st/stm
 ST_CMSIS = hw/mcu/st/cmsis_device_$(ST_FAMILY)
 ST_HAL_DRIVER = hw/mcu/st/stm32$(ST_FAMILY)xx_hal_driver
 
-LD_FILE = $(FAMILY_PATH)/STM32F401VCTx_FLASH.ld
+LD_FILE = application/$(BOARD)/STM32F401VCTx_FLASH.ld
 
 CFLAGS += \
   -flto \
@@ -33,7 +33,6 @@ SRC_C += \
 	$(ST_HAL_DRIVER)/Src/stm32$(ST_FAMILY)xx_hal_gpio.c
 
 INC += \
-	$(TOP)/$(BOARD_PATH) \
 	$(TOP)/lib/CMSIS_5/CMSIS/Core/Include \
 	$(TOP)/$(ST_CMSIS)/Include \
 	$(TOP)/$(ST_HAL_DRIVER)/Inc
