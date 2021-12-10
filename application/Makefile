@@ -13,8 +13,6 @@ INC += \
 	$(TOP)/$(FREERTOS_SRC)/portable/GCC/$(FREERTOS_PORT)
 
 INC += \
-  src \
-  $(TOP)/hw \
   $(TOP)/lib/lwip/src/include \
   $(TOP)/lib/lwip/src/include/ipv4 \
   $(TOP)/lib/lwip/src/include/lwip/apps \

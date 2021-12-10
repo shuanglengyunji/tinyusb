@@ -18,32 +18,10 @@ __check_defined = \
 
 #-------------- Select the board to build for. ------------
 
-# Board without family
-ifneq ($(wildcard $(TOP)/hw/bsp/$(BOARD)/board.mk),)
-BOARD_PATH := hw/bsp/$(BOARD)
-FAMILY :=
-endif
+FAMILY_PATH = application/stm32f4
 
-# Board within family
-ifeq ($(BOARD_PATH),)
-  BOARD_PATH := $(subst $(TOP)/,,$(wildcard $(TOP)/hw/bsp/*/boards/$(BOARD)))
-  FAMILY := $(word 3, $(subst /, ,$(BOARD_PATH)))
-  FAMILY_PATH = hw/bsp/$(FAMILY)
-endif
-
-ifeq ($(BOARD_PATH),)
-  $(info You must provide a BOARD parameter with 'BOARD=')
-  $(error Invalid BOARD specified)
-endif
-
-ifeq ($(FAMILY),)
-  include $(TOP)/hw/bsp/$(BOARD)/board.mk
-else
-  # Include Family and Board specific defs
-  include $(TOP)/$(FAMILY_PATH)/family.mk
-
-  SRC_C += $(subst $(TOP)/,,$(wildcard $(TOP)/$(FAMILY_PATH)/*.c))
-endif
+include $(TOP)/$(FAMILY_PATH)/board.mk
+SRC_C += $(subst $(TOP)/,,$(wildcard $(TOP)/$(FAMILY_PATH)/*.c))
 
 # Fetch submodules depended by family
 fetch_submodule_if_empty = $(if $(wildcard $(TOP)/$1/*),,$(info $(shell git -C $(TOP) submodule update --init $1)))
@@ -74,10 +52,6 @@ else
 endif
 
 #-------------- Source files and compiler flags --------------
-
-# Include all source C in family & board folder
-SRC_C += hw/bsp/board.c
-SRC_C += $(subst $(TOP)/,,$(wildcard $(TOP)/$(BOARD_PATH)/*.c))
 
 INC   += $(TOP)/$(FAMILY_PATH)
 
