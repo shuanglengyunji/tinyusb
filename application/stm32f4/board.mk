@@ -40,11 +40,8 @@ INC += \
 # For freeRTOS port source
 FREERTOS_PORT = ARM_CM4F
 
-# # For flash-jlink target
-# JLINK_DEVICE = stm32f401cc
-
-# # flash target using on-board stlink
-# flash: flash-stlink
+# flash target using on-board stlink
+flash: flash-stlink
 
 # # flash target ROM bootloader
 # flash: $(BUILD)/$(PROJECT).bin

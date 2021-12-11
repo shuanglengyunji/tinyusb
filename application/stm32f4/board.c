@@ -38,11 +38,11 @@
 #define BUTTON_STATE_ACTIVE   0
 
 // Enable PA2 as the debug log UART
-//#define UART_DEV              USART2
-//#define UART_GPIO_PORT        GPIOA
-//#define UART_GPIO_AF          GPIO_AF7_USART2
-//#define UART_TX_PIN           GPIO_PIN_2
-//#define UART_RX_PIN           GPIO_PIN_3
+#define UART_DEV              USART1
+#define UART_GPIO_PORT        GPIOA
+#define UART_GPIO_AF          GPIO_AF7_USART1
+#define UART_TX_PIN           GPIO_PIN_9
+#define UART_RX_PIN           GPIO_PIN_10
 
 
 //--------------------------------------------------------------------+
@@ -84,15 +84,8 @@ static inline void board_clock_init(void)
   // Enable clocks for LED, Button, Uart
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  //__HAL_RCC_USART2_CLK_ENABLE();
-}
-
-static inline void board_vbus_sense_init(void)
-{
-  // Blackpill doens't use VBUS sense (B device) explicitly disable it
-  USB_OTG_FS->GCCFG |= USB_OTG_GCCFG_NOVBUSSENS;
-  USB_OTG_FS->GCCFG &= ~USB_OTG_GCCFG_VBUSBSEN;
-  USB_OTG_FS->GCCFG &= ~USB_OTG_GCCFG_VBUSASEN;
+  __HAL_RCC_USART1_CLK_ENABLE();
+  __HAL_RCC_USART2_CLK_ENABLE();
 }
 
 //--------------------------------------------------------------------+
@@ -180,35 +173,19 @@ void board_init(void)
   GPIO_InitStruct.Alternate = GPIO_AF10_OTG_FS;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /* Configure VBUS Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_9;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* ID Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_10;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF10_OTG_FS;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-#ifdef STM32F412Zx
-  /* Configure POWER_SWITCH IO pin */
-  __HAL_RCC_GPIOG_CLK_ENABLE();
-  GPIO_InitStruct.Pin = GPIO_PIN_8;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
-#endif
-
   // Enable USB OTG clock
   __HAL_RCC_USB_OTG_FS_CLK_ENABLE();
 
 //  __HAL_RCC_USB_OTG_HS_CLK_ENABLE();
 
-  board_vbus_sense_init();
+  // Blackpill doesn't use VBUS sense (B device) explicitly disable it
+  USB_OTG_FS->GCCFG |= USB_OTG_GCCFG_NOVBUSSENS;
+  USB_OTG_FS->GCCFG &= ~USB_OTG_GCCFG_VBUSBSEN;
+  USB_OTG_FS->GCCFG &= ~USB_OTG_GCCFG_VBUSASEN;
+
+  // Force device mode so the ID Pin can be ignored
+  USB_OTG_FS->GUSBCFG &= ~USB_OTG_GUSBCFG_FHMOD;
+  USB_OTG_FS->GUSBCFG |= USB_OTG_GUSBCFG_FDMOD;
 }
 
 //--------------------------------------------------------------------+
