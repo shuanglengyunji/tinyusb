@@ -4,7 +4,7 @@ DEPS_SUBMODULES += lib/CMSIS_5 hw/mcu/st/cmsis_device_$(ST_FAMILY) hw/mcu/st/stm
 ST_CMSIS = hw/mcu/st/cmsis_device_$(ST_FAMILY)
 ST_HAL_DRIVER = hw/mcu/st/stm32$(ST_FAMILY)xx_hal_driver
 
-LD_FILE = application/$(BOARD)/STM32F401VCTx_FLASH.ld
+LD_FILE = $(addprefix $(CURRENT_PATH)/, $(BOARD)/STM32F401VCTx_FLASH.ld)
 
 CFLAGS += \
   -flto \
