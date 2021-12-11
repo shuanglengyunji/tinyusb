@@ -223,6 +223,7 @@ static err_t linkoutput_fn(struct netif *netif, struct pbuf *p)
       tud_network_xmit(p, 0 /* unused for this example */);
       return ERR_OK;
     }
+
     vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
@@ -288,8 +289,6 @@ void net_task(void* params)
 
     sys_check_timeouts();
 
-    // For ESP32-S2 this delay is essential to allow idle how to run and reset wdt
-    // vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
