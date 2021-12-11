@@ -306,7 +306,7 @@ bool tud_network_recv_cb(const uint8_t *src, uint16_t size)
     return false;
   }
   
-  if( xMessageBufferSend( usbToLwipMessageBuffer, (void *) src, size, 0) != size )
+  if( xMessageBufferSend(usbToLwipMessageBuffer, (void *) src, size, 0) != size)
   {
     return false;
   }
