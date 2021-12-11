@@ -66,25 +66,23 @@ enum  {
   BLINK_SUSPENDED = 2500,
 };
 
-// static timer
+// led timer
 StaticTimer_t blinky_tmdef;
 TimerHandle_t blinky_tm;
 void led_blinky_cb(TimerHandle_t xTimer);
 
-// static task
-StackType_t  usb_device_stack[USBD_STACK_SIZE];
-StaticTask_t usb_device_taskdef;
-void usb_device_task(void* param);
+// tinyusb demon task
+StackType_t  usb_stack[USBD_STACK_SIZE];
+StaticTask_t usb_taskdef;
+void usb_task(void* param);
 
-// static task for net
-#define NET_STACK_SZIE      configMINIMAL_STACK_SIZE*10
+// network task
+#define NET_STACK_SZIE      configMINIMAL_STACK_SIZE
 StackType_t  net_stack[NET_STACK_SZIE];
 StaticTask_t net_taskdef;
 void net_task(void* params);
 
-#define STORAGE_SIZE_BYTES 10240
-
-static uint8_t bufferUsbToLwip[ STORAGE_SIZE_BYTES ];
+static uint8_t bufferUsbToLwip[ CFG_TUD_NET_MTU*3 ];
 StaticMessageBuffer_t usbToLwipMessageBufferStruct;
 MessageBufferHandle_t usbToLwipMessageBuffer;
 
@@ -104,7 +102,7 @@ int main(void)
   xTimerStart(blinky_tm, 0);
 
   // Create a task for tinyusb device stack
-  (void) xTaskCreateStatic( usb_device_task, "usbd", USBD_STACK_SIZE, NULL, configMAX_PRIORITIES-1, usb_device_stack, &usb_device_taskdef);
+  (void) xTaskCreateStatic( usb_task, "usbd", USBD_STACK_SIZE, NULL, configMAX_PRIORITIES-1, usb_stack, &usb_taskdef);
 
   // Create CDC task
   (void) xTaskCreateStatic( net_task, "net", NET_STACK_SZIE, NULL, configMAX_PRIORITIES-2, net_stack, &net_taskdef);
@@ -117,7 +115,7 @@ int main(void)
 
 // USB Device Driver task
 // This top level thread process all usb events and invoke callbacks
-void usb_device_task(void* param)
+void usb_task(void* param)
 {
   (void) param;
 
@@ -275,21 +273,17 @@ void net_task(void* params)
   // RTOS forever loop
   while ( 1 )
   {
-    /* Receive the next message from the message buffer.  Wait in the Blocked
-    state (so not using any CPU processing time) for a maximum of 100ms for
-    a message to become available. */
-    size_t xReceivedBytes = xMessageBufferReceive( usbToLwipMessageBuffer,
-                                            ( void * ) ucRxData,
-                                            sizeof( ucRxData ),
-                                            0 );
-    if (xReceivedBytes > 0)
+    struct pbuf *p = pbuf_alloc(PBUF_RAW, CFG_TUD_NET_MTU, PBUF_POOL);  // CFG_TUD_NET_MTU is the maximum package length 
+    if (p)
     {
-      struct pbuf *p = pbuf_alloc(PBUF_RAW, xReceivedBytes, PBUF_POOL);
-      memcpy(p->payload, ucRxData, xReceivedBytes);
-
-      ethernet_input(p, &netif_data);
+      size_t size = xMessageBufferReceive(usbToLwipMessageBuffer, (void*)p->payload, CFG_TUD_NET_MTU, 0);
+      if (size > 0)
+      {
+        pbuf_realloc(p, size);
+        ethernet_input(p, &netif_data);
+        tud_network_recv_renew();
+      }
       pbuf_free(p);
-      tud_network_recv_renew();
     }
 
     sys_check_timeouts();
@@ -307,18 +301,14 @@ void tud_network_init_cb(void)
 
 bool tud_network_recv_cb(const uint8_t *src, uint16_t size)
 {
-  if (size)
+  if (size == 0)
   {
-    /* Send an array to the message buffer, blocking for a maximum of 100ms to
-    wait for enough space to be available in the message buffer. */
-    size_t xBytesSent = xMessageBufferSend( usbToLwipMessageBuffer,
-                                      ( void * ) src,
-                                      size,
-                                      pdMS_TO_TICKS( 100 ) );
-    if( xBytesSent != size )
-    {
-      printf("timeout: no enough space\n");
-    }
+    return false;
+  }
+  
+  if( xMessageBufferSend( usbToLwipMessageBuffer, (void *) src, size, 0) != size )
+  {
+    return false;
   }
 
   return true;
