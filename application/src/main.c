@@ -36,6 +36,7 @@
 #include "queue.h"
 #include "task.h"
 #include "timers.h"
+#include "message_buffer.h"
 
 #include "dhserver.h"
 #include "lwip/init.h"
@@ -81,6 +82,12 @@ StackType_t  net_stack[NET_STACK_SZIE];
 StaticTask_t net_taskdef;
 void net_task(void* params);
 
+#define STORAGE_SIZE_BYTES 10240
+
+static uint8_t bufferUsbToLwip[ STORAGE_SIZE_BYTES ];
+StaticMessageBuffer_t usbToLwipMessageBufferStruct;
+MessageBufferHandle_t usbToLwipMessageBuffer;
+
 //--------------------------------------------------------------------+
 // Main
 //--------------------------------------------------------------------+
@@ -89,6 +96,9 @@ int main(void)
 {
   board_init();
 
+  // create message buffer  
+  usbToLwipMessageBuffer = xMessageBufferCreateStatic( sizeof( bufferUsbToLwip ), bufferUsbToLwip, &usbToLwipMessageBufferStruct);
+  
   // Create a soft timer for blinky
   blinky_tm = xTimerCreateStatic(NULL, pdMS_TO_TICKS(BLINK_NOT_MOUNTED), true, NULL, led_blinky_cb, &blinky_tmdef);
   xTimerStart(blinky_tm, 0);
@@ -175,9 +185,6 @@ void led_blinky_cb(TimerHandle_t xTimer)
 /* lwip context */
 static struct netif netif_data;
 
-/* shared between tud_network_recv_cb() and service_traffic() */
-static struct pbuf *received_frame;
-
 /* network parameters of this MCU */
 static const ip4_addr_t ipaddr  = INIT_IP4(192, 168, 7, 1);
 static const ip4_addr_t netmask = INIT_IP4(255, 255, 255, 0);
@@ -218,9 +225,7 @@ static err_t linkoutput_fn(struct netif *netif, struct pbuf *p)
       tud_network_xmit(p, 0 /* unused for this example */);
       return ERR_OK;
     }
-
-    /* transfer execution to TinyUSB in the hopes that it will finish transmitting the prior packet */
-    tud_task();
+    vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
@@ -257,6 +262,7 @@ static void init_lwip(void)
   netif_set_default(netif);
 }
 
+uint8_t ucRxData[ 2048 ];
 void net_task(void* params)
 {
   (void) params;
@@ -269,49 +275,49 @@ void net_task(void* params)
   // RTOS forever loop
   while ( 1 )
   {
-    /* handle any packet received by tud_network_recv_cb() */
-    if (received_frame)
+    /* Receive the next message from the message buffer.  Wait in the Blocked
+    state (so not using any CPU processing time) for a maximum of 100ms for
+    a message to become available. */
+    size_t xReceivedBytes = xMessageBufferReceive( usbToLwipMessageBuffer,
+                                            ( void * ) ucRxData,
+                                            sizeof( ucRxData ),
+                                            0 );
+    if (xReceivedBytes > 0)
     {
-      ethernet_input(received_frame, &netif_data);
-      pbuf_free(received_frame);
-      received_frame = NULL;
+      struct pbuf *p = pbuf_alloc(PBUF_RAW, xReceivedBytes, PBUF_POOL);
+      memcpy(p->payload, ucRxData, xReceivedBytes);
+
+      ethernet_input(p, &netif_data);
+      pbuf_free(p);
       tud_network_recv_renew();
     }
 
     sys_check_timeouts();
 
     // For ESP32-S2 this delay is essential to allow idle how to run and reset wdt
-    vTaskDelay(pdMS_TO_TICKS(10));
+    // vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
 void tud_network_init_cb(void)
 {
-  /* if the network is re-initializing and we have a leftover packet, we must do a cleanup */
-  if (received_frame)
-  {
-    pbuf_free(received_frame);
-    received_frame = NULL;
-  }
+  // Is this operation safe ???
+  xMessageBufferReset(usbToLwipMessageBuffer);
 }
 
 bool tud_network_recv_cb(const uint8_t *src, uint16_t size)
 {
-  /* this shouldn't happen, but if we get another packet before 
-  parsing the previous, we must signal our inability to accept it */
-  if (received_frame) return false;
-
   if (size)
   {
-    struct pbuf *p = pbuf_alloc(PBUF_RAW, size, PBUF_POOL);
-
-    if (p)
+    /* Send an array to the message buffer, blocking for a maximum of 100ms to
+    wait for enough space to be available in the message buffer. */
+    size_t xBytesSent = xMessageBufferSend( usbToLwipMessageBuffer,
+                                      ( void * ) src,
+                                      size,
+                                      pdMS_TO_TICKS( 100 ) );
+    if( xBytesSent != size )
     {
-      /* pbuf_alloc() has already initialized struct; all we need to do is copy the data */
-      memcpy(p->payload, src, size);
-
-      /* store away the pointer for service_traffic() to later handle */
-      received_frame = p;
+      printf("timeout: no enough space\n");
     }
   }
 
