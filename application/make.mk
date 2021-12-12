@@ -2,6 +2,8 @@
 # Common make definition for all examples
 # ---------------------------------------
 
+BOARD = stm32f4
+
 # Build directory
 BUILD := _build/$(BOARD)
 
@@ -17,8 +19,6 @@ __check_defined = \
     $(error Undefined make flag: $1$(if $2, ($2))))
 
 #-------------- Select the board to build for. ------------
-
-BOARD = stm32f4
 
 include $(BOARD)/board.mk
 

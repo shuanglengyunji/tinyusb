@@ -10,11 +10,7 @@
 # ---------------------------------------
 
 # libc
-LIBS += -lgcc -lm -lnosys
-
-ifneq ($(BOARD), spresense)
-LIBS += -lc
-endif
+LIBS += -lgcc -lm -lnosys -lc
 
 # TinyUSB Stack source
 SRC_C += \
@@ -74,8 +70,7 @@ endif
 # ---------------------------------------
 
 all: $(BUILD)/$(PROJECT).bin $(BUILD)/$(PROJECT).hex size
-
-uf2: $(BUILD)/$(PROJECT).uf2
+	@echo Building $(PROJECT) in $(BUILD)
 
 OBJ_DIRS = $(sort $(dir $(OBJ)))
 $(OBJ): | $(OBJ_DIRS)
@@ -93,18 +88,6 @@ $(BUILD)/$(PROJECT).bin: $(BUILD)/$(PROJECT).elf
 $(BUILD)/$(PROJECT).hex: $(BUILD)/$(PROJECT).elf
 	@echo CREATE $@
 	@$(OBJCOPY) -O ihex $^ $@
-
-# UF2 generation, iMXRT need to strip to text only before conversion
-ifeq ($(FAMILY),imxrt)
-$(BUILD)/$(PROJECT).uf2: $(BUILD)/$(PROJECT).elf
-	@echo CREATE $@
-	@$(OBJCOPY) -O ihex -R .flash_config -R .ivt $^ $(BUILD)/$(PROJECT)-textonly.hex
-	$(PYTHON) $(TOP)/tools/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID) -c -o $@ $(BUILD)/$(PROJECT)-textonly.hex
-else
-$(BUILD)/$(PROJECT).uf2: $(BUILD)/$(PROJECT).hex
-	@echo CREATE $@
-	$(PYTHON) $(TOP)/tools/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID) -c -o $@ $^
-endif
 
 # We set vpath to point to the top of the tree so that the source files
 # can be located. By following this scheme, it allows a single build rule
