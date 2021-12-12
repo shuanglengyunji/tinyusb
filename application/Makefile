@@ -1,4 +1,4 @@
-DEPS_SUBMODULES += lib/FreeRTOS-Kernel
+DEPS_SUBMODULES += lib/FreeRTOS-Kernel lib/lwip
 
 include ../tools/top.mk
 include ./make.mk

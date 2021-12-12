@@ -41,17 +41,10 @@ GDB = $(CROSS_COMPILE)gdb
 OBJCOPY = $(CROSS_COMPILE)objcopy
 SIZE = $(CROSS_COMPILE)size
 MKDIR = mkdir
-
-ifeq ($(CMDEXE),1)
-  CP = copy
-  RM = del
-  PYTHON = python
-else
-  SED = sed
-  CP = cp
-  RM = rm
-  PYTHON = python3
-endif
+SED = sed
+CP = cp
+RM = rm
+PYTHON = python3
 
 #-------------- Source files and compiler flags --------------
 

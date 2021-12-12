@@ -5,9 +5,6 @@
 # Set all as default goal
 .DEFAULT_GOAL := all
 
-# ESP32-Sx and RP2040 has its own CMake build system
-ifeq (,$(findstring $(FAMILY),esp32s2 esp32s3 rp2040))
-
 # ---------------------------------------
 # Compiler Flags
 # ---------------------------------------
@@ -83,11 +80,7 @@ uf2: $(BUILD)/$(PROJECT).uf2
 OBJ_DIRS = $(sort $(dir $(OBJ)))
 $(OBJ): | $(OBJ_DIRS)
 $(OBJ_DIRS):
-ifeq ($(CMDEXE),1)
-	@$(MKDIR) $(subst /,\,$@)
-else
 	@$(MKDIR) -p $@
-endif
 
 $(BUILD)/$(PROJECT).elf: $(OBJ)
 	@echo LINK $@
@@ -113,8 +106,6 @@ $(BUILD)/$(PROJECT).uf2: $(BUILD)/$(PROJECT).hex
 	$(PYTHON) $(TOP)/tools/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID) -c -o $@ $^
 endif
 
-copy-artifact: $(BUILD)/$(PROJECT).bin $(BUILD)/$(PROJECT).hex $(BUILD)/$(PROJECT).uf2
-
 # We set vpath to point to the top of the tree so that the source files
 # can be located. By following this scheme, it allows a single build rule
 # to be used to compile all .c files.
@@ -135,8 +126,6 @@ $(BUILD)/obj/%_asm.o: %.S
 	@echo AS $(notdir $@)
 	@$(CC) -x assembler-with-cpp $(ASFLAGS) -c -o $@ $<
 
-endif # GNU Make
-
 size: $(BUILD)/$(PROJECT).elf
 	-@echo ''
 	@$(SIZE) $<
@@ -148,22 +137,11 @@ linkermap: $(BUILD)/$(PROJECT).elf
 
 .PHONY: clean
 clean:
-ifeq ($(CMDEXE),1)
-	rd /S /Q $(subst /,\,$(BUILD))
-else
 	$(RM) -rf $(BUILD)
-endif
 
 # ---------------------------------------
 # Flash Targets
 # ---------------------------------------
-
-# Jlink binary
-ifeq ($(OS),Windows_NT)
-  JLINKEXE = JLink.exe
-else
-  JLINKEXE = JLinkExe
-endif
 
 # Jlink Interface
 JLINK_IF ?= swd
@@ -176,48 +154,8 @@ flash-jlink: $(BUILD)/$(PROJECT).hex
 	@echo r >> $(BUILD)/$(BOARD).jlink
 	@echo go >> $(BUILD)/$(BOARD).jlink
 	@echo exit >> $(BUILD)/$(BOARD).jlink
-	$(JLINKEXE) -device $(JLINK_DEVICE) -if $(JLINK_IF) -JTAGConf -1,-1 -speed auto -CommandFile $(BUILD)/$(BOARD).jlink
+	JLinkExe -device $(JLINK_DEVICE) -if $(JLINK_IF) -JTAGConf -1,-1 -speed auto -CommandFile $(BUILD)/$(BOARD).jlink
 
 # Flash STM32 MCU using stlink with STM32 Cube Programmer CLI
 flash-stlink: $(BUILD)/$(PROJECT).elf
 	STM32_Programmer_CLI --connect port=swd --write $< --go
-
-# Flash using pyocd
-PYOCD_OPTION ?=
-flash-pyocd: $(BUILD)/$(PROJECT).hex
-	pyocd flash -t $(PYOCD_TARGET) $(PYOCD_OPTION) $<
-	pyocd reset -t $(PYOCD_TARGET)
-
-# Flash using openocd
-OPENOCD_OPTION ?=
-flash-openocd: $(BUILD)/$(PROJECT).elf
-	openocd $(OPENOCD_OPTION) -c "program $< verify reset exit"
-
-# flash with Black Magic Probe
-# This symlink is created by https://github.com/blacksphere/blackmagic/blob/master/driver/99-blackmagic.rules
-BMP ?= /dev/ttyBmpGdb
-
-flash-bmp: $(BUILD)/$(PROJECT).elf
-	$(GDB) --batch -ex 'target extended-remote $(BMP)' -ex 'monitor swdp_scan' -ex 'attach 1' -ex load  $<
-
-debug-bmp: $(BUILD)/$(PROJECT).elf
-	$(GDB) -ex 'target extended-remote $(BMP)' -ex 'monitor swdp_scan' -ex 'attach 1' $<
-
-#-------------- Artifacts --------------
-
-# Create binary directory
-$(BIN):
-	@$(MKDIR) -p $@
-
-# Copy binaries .elf, .bin, .hex, .uf2 to BIN for upload
-# due to large size of combined artifacts, only uf2 is uploaded for now
-copy-artifact: $(BIN)
-	@$(CP) $(BUILD)/$(PROJECT).uf2 $(BIN)
-	#@$(CP) $(BUILD)/$(PROJECT).bin $(BIN)
-	#@$(CP) $(BUILD)/$(PROJECT).hex $(BIN)
-	#@$(CP) $(BUILD)/$(PROJECT).elf $(BIN)
-
-# Print out the value of a make variable.
-# https://stackoverflow.com/questions/16467718/how-to-print-out-a-variable-in-makefile
-print-%:
-	@echo $* = $($*)
