@@ -42,11 +42,11 @@
 #define BUTTON_STATE_ACTIVE   0
 
 // Enable PA2 as the debug log UART
-//#define UART_DEV              USART2
-//#define UART_GPIO_PORT        GPIOA
-//#define UART_GPIO_AF          GPIO_AF7_USART2
-//#define UART_TX_PIN           GPIO_PIN_2
-//#define UART_RX_PIN           GPIO_PIN_3
+#define UART_DEV              USART2
+#define UART_GPIO_PORT        GPIOA
+#define UART_GPIO_AF          GPIO_AF7_USART2
+#define UART_TX_PIN           GPIO_PIN_2
+#define UART_RX_PIN           GPIO_PIN_3
 
 
 //--------------------------------------------------------------------+
