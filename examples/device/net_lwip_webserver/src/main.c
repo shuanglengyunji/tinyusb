@@ -52,6 +52,7 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #include "lwip/timeouts.h"
 #include "lwip/ethip6.h"
 #include "httpd.h"
+#include "tcpecho_raw.h"
 
 #define INIT_IP4(a,b,c,d) { PP_HTONL(LWIP_MAKEU32(a,b,c,d)) }
 
@@ -116,13 +117,6 @@ static err_t ip4_output_fn(struct netif *netif, struct pbuf *p, const ip4_addr_t
   return etharp_output(netif, p, addr);
 }
 
-#if LWIP_IPV6
-static err_t ip6_output_fn(struct netif *netif, struct pbuf *p, const ip6_addr_t *addr)
-{
-  return ethip6_output(netif, p, addr);
-}
-#endif
-
 static err_t netif_init_cb(struct netif *netif)
 {
   LWIP_ASSERT("netif != NULL", (netif != NULL));
@@ -133,9 +127,6 @@ static err_t netif_init_cb(struct netif *netif)
   netif->name[1] = 'X';
   netif->linkoutput = linkoutput_fn;
   netif->output = ip4_output_fn;
-#if LWIP_IPV6
-  netif->output_ip6 = ip6_output_fn;
-#endif
   return ERR_OK;
 }
 
@@ -151,9 +142,6 @@ static void init_lwip(void)
   netif->hwaddr[5] ^= 0x01;
 
   netif = netif_add(netif, &ipaddr, &netmask, &gateway, NULL, netif_init_cb, ip_input);
-#if LWIP_IPV6
-  netif_create_ip6_linklocal_address(netif, 1);
-#endif
   netif_set_default(netif);
 }
 
@@ -238,6 +226,7 @@ int main(void)
   while (dhserv_init(&dhcp_config) != ERR_OK);
   while (dnserv_init(IP_ADDR_ANY, 53, dns_query_proc) != ERR_OK);
   httpd_init();
+  tcpecho_raw_init();
 
   while (1)
   {
