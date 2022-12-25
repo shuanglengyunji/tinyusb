@@ -88,7 +88,7 @@ static inline void board_clock_init(void)
   // Enable clocks for LED, Button, Uart
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  //__HAL_RCC_USART2_CLK_ENABLE();
+  __HAL_RCC_USART2_CLK_ENABLE();
 }
 
 static inline void board_vbus_sense_init(void)
