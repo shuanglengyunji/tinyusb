@@ -32,9 +32,19 @@
 #ifndef __LWIPOPTS_H__
 #define __LWIPOPTS_H__
 
+// #define LWIP_DEBUG
+// #define TCP_DEBUG                       LWIP_DBG_ON
+// #define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
+// #define LWIP_DBG_MIN_LEVEL              LWIP_DBG_LEVEL_WARNING
+
+// #define LWIP_STATS_DISPLAY              1
+// #define UDP_STATS                       0
+// #define ICMP_STATS                      0
+
 /* Prevent having to link sys_arch.c (we don't test the API layers in unit tests) */
 #define NO_SYS                          1
 #define MEM_ALIGNMENT                   4
+#define MEM_SIZE                        (10 * 1024)
 #define LWIP_RAW                        0
 #define LWIP_NETCONN                    0
 #define LWIP_SOCKET                     0
