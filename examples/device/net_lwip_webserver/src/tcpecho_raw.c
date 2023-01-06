@@ -46,6 +46,8 @@
 #include "lwip/tcp.h"
 #include "tcpecho_raw.h"
 
+extern int main_uart_write(void const * buf, int len);
+
 #if LWIP_TCP && LWIP_CALLBACK_API
 
 static struct tcp_pcb *tcpecho_raw_pcb;
@@ -98,36 +100,30 @@ static void
 tcpecho_raw_send(struct tcp_pcb *tpcb, struct tcpecho_raw_state *es)
 {
   struct pbuf *ptr;
+  u16_t plen;
   err_t wr_err = ERR_OK;
 
   while ((wr_err == ERR_OK) &&
-         (es->p != NULL) &&
-         (es->p->len <= tcp_sndbuf(tpcb))) {
+         (es->p != NULL)) {
     ptr = es->p;
+    plen = ptr->len;
 
-    /* enqueue data for transmission */
-    wr_err = tcp_write(tpcb, ptr->payload, ptr->len, 1);
-    if (wr_err == ERR_OK) {
-      u16_t plen;
-
-      plen = ptr->len;
-      /* continue with next pbuf in chain (if any) */
-      es->p = ptr->next;
-      if(es->p != NULL) {
-        /* new reference! */
-        pbuf_ref(es->p);
-      }
-      /* chop first pbuf from chain */
-      pbuf_free(ptr);
-      /* we can read more data now */
-      tcp_recved(tpcb, plen);
-    } else if(wr_err == ERR_MEM) {
-      /* we are low on memory, try later / harder, defer to poll */
-      es->p = ptr;
-    } else {
-      /* other problem ?? */
+    /* relay data */
+    main_uart_write(ptr->payload, plen);
+    
+    /* continue with next pbuf in chain (if any) */
+    es->p = ptr->next;
+    if(es->p != NULL) {
+      /* new reference! */
+      pbuf_ref(es->p);
     }
-  }
+
+    /* chop first pbuf from chain */
+    pbuf_free(ptr);
+
+    /* we can read more data now */
+    tcp_recved(tpcb, plen);
+  };
 }
 
 static void

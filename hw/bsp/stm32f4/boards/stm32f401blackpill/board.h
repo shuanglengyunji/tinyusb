@@ -88,6 +88,7 @@ static inline void board_clock_init(void)
   // Enable clocks for LED, Button, Uart
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_USART1_CLK_ENABLE();
   __HAL_RCC_USART2_CLK_ENABLE();
 }
 
@@ -97,6 +98,10 @@ static inline void board_vbus_sense_init(void)
   USB_OTG_FS->GCCFG |= USB_OTG_GCCFG_NOVBUSSENS;
   USB_OTG_FS->GCCFG &= ~USB_OTG_GCCFG_VBUSBSEN;
   USB_OTG_FS->GCCFG &= ~USB_OTG_GCCFG_VBUSASEN;
+
+  // Force device mode so the ID Pin can be ignored
+  USB_OTG_FS->GUSBCFG &= ~USB_OTG_GUSBCFG_FHMOD;
+  USB_OTG_FS->GUSBCFG |= USB_OTG_GUSBCFG_FDMOD;
 }
 
 #ifdef __cplusplus
