@@ -56,7 +56,6 @@ enum tcpecho_raw_states
 {
   ES_NONE = 0,
   ES_ACCEPTED,
-  ES_RECEIVED,
   ES_CLOSING
 };
 
@@ -212,24 +211,25 @@ tcpecho_raw_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
     ret_err = err;
   }
   else if(es->state == ES_ACCEPTED) {
-    /* first data chunk in p->payload */
-    es->state = ES_RECEIVED;
-    /* store reference to incoming pbuf (chain) */
-    es->p = p;
-    tcpecho_raw_send(tpcb, es);
-    ret_err = ERR_OK;
-  } else if (es->state == ES_RECEIVED) {
-    /* read some more data */
-    if(es->p == NULL) {
-      es->p = p;
-      tcpecho_raw_send(tpcb, es);
-    } else {
-      struct pbuf *ptr;
-
-      /* chain pbufs to the end of what we recv'ed previously  */
-      ptr = es->p;
-      pbuf_cat(ptr,p);
-    }
+    struct pbuf *ptr;
+    u16_t plen;
+    /* send received pbuf(s) to UART*/
+    while (p != NULL) {
+      ptr = p;
+      plen = ptr->len;
+      /* relay data */
+      main_uart_write(ptr->payload, plen);
+      /* continue with next pbuf in chain (if any) */
+      p = ptr->next;
+      if(p != NULL) {
+        /* new reference! */
+        pbuf_ref(p);
+      }
+      /* chop first pbuf from chain */
+      pbuf_free(ptr);
+      /* we can read more data now */
+      tcp_recved(tpcb, plen);
+    };
     ret_err = ERR_OK;
   } else {
     /* unknown es->state, trash data  */
