@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debug (OpenOCD)",
+            "name": "Debug (OpenOCD)",
             "cwd" : "${workspaceRoot}",
             "executable": "examples/device/net_lwip_webserver/_build/stm32f401blackpill/net_lwip_webserver.elf",
             "type": "cortex-debug",
@@ -12,8 +12,21 @@
                 "target/stm32f4x.cfg"
             ],
             "request" : "launch",   // launch or attach, attach can be handy if your code has hung
-            "gdbTarget": "127.0.0.1:50000",
             "runToEntryPoint": "main",
+            // "gdbPath" : "/usr/bin/gdb-multiarch",
+            // "armToolchainPath": "/home/han/gcc-arm-none-eabi-10.3-2021.10/bin/",
+        },
+        {
+            "name": "Attach (OpenOCD)",
+            "cwd" : "${workspaceRoot}",
+            "executable": "examples/device/net_lwip_webserver/_build/stm32f401blackpill/net_lwip_webserver.elf",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "configFiles": [
+                "interface/stlink-v2.cfg",
+                "target/stm32f4x.cfg"
+            ],
+            "request" : "attach",   // launch or attach, attach can be handy if your code has hung
             // "gdbPath" : "/usr/bin/gdb-multiarch",
             // "armToolchainPath": "/home/han/gcc-arm-none-eabi-10.3-2021.10/bin/",
         },
