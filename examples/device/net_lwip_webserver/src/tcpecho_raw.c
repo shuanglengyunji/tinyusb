@@ -46,7 +46,7 @@
 #include "lwip/tcp.h"
 #include "tcpecho_raw.h"
 
-extern int main_uart_write(void const * buf, int len);
+#include <string.h>
 
 #if LWIP_TCP && LWIP_CALLBACK_API
 
@@ -64,9 +64,13 @@ struct tcpecho_raw_state
   u8_t state;
   u8_t retries;
   struct tcp_pcb *pcb;
-  /* pbuf (chain) to recycle */
+  /* pbuf (chain) to send */
   struct pbuf *p;
+  /* received pbuf (chain)*/
+  struct pbuf *rx;
 };
+
+static struct tcpecho_raw_state *active = NULL;
 
 static void
 tcpecho_raw_free(struct tcpecho_raw_state *es)
@@ -75,6 +79,10 @@ tcpecho_raw_free(struct tcpecho_raw_state *es)
     if (es->p) {
       /* free the buffer chain if present */
       pbuf_free(es->p);
+    }
+    if (es->rx) {
+      /* free the buffer chain if present */
+      pbuf_free(es->rx);
     }
 
     mem_free(es);
@@ -93,43 +101,41 @@ tcpecho_raw_close(struct tcp_pcb *tpcb, struct tcpecho_raw_state *es)
   tcpecho_raw_free(es);
 
   tcp_close(tpcb);
+
+  active = NULL;
 }
 
-static void
-tcpecho_raw_send(struct tcp_pcb *tpcb, struct tcpecho_raw_state *es)
-{
-  struct pbuf *ptr;
-  err_t wr_err = ERR_OK;
+// static void
+// tcpecho_raw_send(struct tcp_pcb *tpcb, struct tcpecho_raw_state *es)
+// {
+//   struct pbuf *ptr;
+//   err_t wr_err = ERR_OK;
 
-  while ((wr_err == ERR_OK) &&
-         (es->p != NULL) &&
-         (es->p->len <= tcp_sndbuf(tpcb))) {
-    ptr = es->p;
+//   while ((wr_err == ERR_OK) &&
+//          (es->p != NULL) &&
+//          (es->p->len <= tcp_sndbuf(tpcb))) {
+//     ptr = es->p;
 
-    /* enqueue data for transmission */
-    wr_err = tcp_write(tpcb, ptr->payload, ptr->len, 1);
-    if (wr_err == ERR_OK) {
-      u16_t plen;
+//     /* enqueue data for transmission */
+//     wr_err = tcp_write(tpcb, ptr->payload, ptr->len, 1);
+//     if (wr_err == ERR_OK) {
+//       /* continue with next pbuf in chain (if any) */
+//       es->p = ptr->next;
+//       if(es->p != NULL) {
+//         /* new reference! */
+//         pbuf_ref(es->p);
+//       }
+//       /* chop first pbuf from chain */
+//       pbuf_free(ptr);
+//     } else if(wr_err == ERR_MEM) {
+//       /* we are low on memory, try later / harder, defer to poll */
+//       es->p = ptr;
+//     } else {
+//       /* other problem ?? */
+//     }
+//   }
+// }
 
-      plen = ptr->len;
-      /* continue with next pbuf in chain (if any) */
-      es->p = ptr->next;
-      if(es->p != NULL) {
-        /* new reference! */
-        pbuf_ref(es->p);
-      }
-      /* chop first pbuf from chain */
-      pbuf_free(ptr);
-      /* we can read more data now */
-      tcp_recved(tpcb, plen);
-    } else if(wr_err == ERR_MEM) {
-      /* we are low on memory, try later / harder, defer to poll */
-      es->p = ptr;
-    } else {
-      /* other problem ?? */
-    }
-  }
-}
 static void
 tcpecho_raw_error(void *arg, err_t err)
 {
@@ -145,49 +151,29 @@ tcpecho_raw_error(void *arg, err_t err)
 static err_t
 tcpecho_raw_poll(void *arg, struct tcp_pcb *tpcb)
 {
-  err_t ret_err;
   struct tcpecho_raw_state *es;
 
   es = (struct tcpecho_raw_state *)arg;
-  if (es != NULL) {
-    if (es->p != NULL) {
-      /* there is a remaining pbuf (chain)  */
-      tcpecho_raw_send(tpcb, es);
-    } else {
-      /* no remaining pbuf (chain)  */
-      if(es->state == ES_CLOSING) {
-        tcpecho_raw_close(tpcb, es);
-      }
-    }
-    ret_err = ERR_OK;
-  } else {
+  if (es == NULL) {
     /* nothing to be done */
     tcp_abort(tpcb);
-    ret_err = ERR_ABRT;
+    return ERR_ABRT;
   }
-  return ret_err;
+
+  if (es->state == ES_CLOSING) {
+    tcpecho_raw_close(tpcb, es);
+  }
+
+  return ERR_OK;
 }
 
 static err_t
 tcpecho_raw_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
 {
-  struct tcpecho_raw_state *es;
-
+  LWIP_UNUSED_ARG(arg);
+  LWIP_UNUSED_ARG(tpcb);
   LWIP_UNUSED_ARG(len);
-
-  es = (struct tcpecho_raw_state *)arg;
-  es->retries = 0;
-
-  if(es->p != NULL) {
-    /* still got pbufs to send */
-    tcp_sent(tpcb, tcpecho_raw_sent);
-    tcpecho_raw_send(tpcb, es);
-  } else {
-    /* no more pbufs to send */
-    if(es->state == ES_CLOSING) {
-      tcpecho_raw_close(tpcb, es);
-    }
-  }
+  
   return ERR_OK;
 }
 
@@ -202,13 +188,7 @@ tcpecho_raw_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
   if (p == NULL) {
     /* remote host closed connection */
     es->state = ES_CLOSING;
-    if(es->p == NULL) {
-      /* we're done sending, close it */
-      tcpecho_raw_close(tpcb, es);
-    } else {
-      /* we're not done yet */
-      tcpecho_raw_send(tpcb, es);
-    }
+    tcpecho_raw_close(tpcb, es);
     ret_err = ERR_OK;
   } else if(err != ERR_OK) {
     /* cleanup, for unknown reason */
@@ -216,25 +196,12 @@ tcpecho_raw_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
     ret_err = err;
   }
   else if(es->state == ES_ACCEPTED) {
-    struct pbuf *ptr;
-    u16_t plen;
-    /* send received pbuf(s) to UART*/
-    while (p != NULL) {
-      ptr = p;
-      plen = ptr->len;
-      /* relay data */
-      main_uart_write(ptr->payload, plen);
-      /* continue with next pbuf in chain (if any) */
-      p = ptr->next;
-      if(p != NULL) {
-        /* new reference! */
-        pbuf_ref(p);
-      }
-      /* chop first pbuf from chain */
-      pbuf_free(ptr);
-      /* we can read more data now */
-      tcp_recved(tpcb, plen);
-    };
+    if(es->rx == NULL) {
+      es->rx = p;
+    } else {
+      /* chain pbufs to the end of what we recv'ed previously  */
+      pbuf_cat(es->rx, p);
+    }
     ret_err = ERR_OK;
   } else {
     /* unknown es->state, trash data  */
@@ -273,6 +240,7 @@ tcpecho_raw_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
     tcp_err(newpcb, tcpecho_raw_error);
     tcp_poll(newpcb, tcpecho_raw_poll, 0);
     tcp_sent(newpcb, tcpecho_raw_sent);
+    active = es;
     ret_err = ERR_OK;
   } else {
     ret_err = ERR_MEM;
@@ -297,6 +265,82 @@ tcpecho_raw_init(void)
   } else {
     /* abort? output diagnostic? */
   }
+}
+
+uint16_t tcpecho_read(void* dataptr, uint16_t len)
+{
+  struct pbuf *ptr;
+  uint16_t data_len;
+  uint16_t copied_len;
+
+  if (active == NULL) {
+    /* no active tcp connection */
+    return 0;
+  }
+
+  ptr = active->rx;
+  if (ptr == NULL) {
+    /* receive chain empty, no data to read*/
+    return 0;
+  }
+  // TODO: handle ptr->next != NULL 
+  // we are only able to copy one pbuf for the moment
+  data_len = ptr->tot_len;
+  copied_len = len >= data_len ? data_len : len;
+  memcpy(dataptr, ptr->payload, data_len);
+  pbuf_free(ptr);
+  active->rx = NULL;
+
+  /* now we can receive more data */
+  tcp_recved(active->pcb, data_len);
+  
+  return copied_len;
+}
+
+uint16_t tcpecho_write(const void* dataptr, uint16_t len)
+{
+  struct pbuf *ptr;
+  err_t err;
+
+  if (active == NULL) {
+    /* no active tcp connection, can't send */
+    return 0;
+  }
+
+  // TODO: send less when no enough ram in lwip
+  // TODO: should this be allocated from PBUF_RAM?
+  ptr = pbuf_alloc(PBUF_TRANSPORT, len, PBUF_RAM);
+  if (ptr == NULL) {
+    // cannot allocate pbuf
+    return 0;
+  }
+  err = pbuf_take(ptr, dataptr, len);
+  if (err != ERR_OK) {
+    // some error
+    pbuf_free(ptr);
+    return 0;
+  }
+
+  if (len > tcp_sndbuf(active->pcb)) {
+    printf("error: tcpecho_write: len > tcp_sndbuf(active->pcb)\n");
+    return 0;
+  }
+
+  err = tcp_write(active->pcb, ptr->payload, ptr->len, TCP_WRITE_FLAG_COPY);
+  if (err == ERR_OK) {
+    // TODO: handle ptr as an pbuf chain
+    pbuf_free(ptr);
+  } else if(err == ERR_MEM) {
+    /* we are low on memory, try later / harder, defer to poll */
+    printf("error: tcpecho_write: ERR_MEM\n");
+    pbuf_free(ptr);
+  } else {
+    /* other problem ?? */
+    printf("error: tcpecho_write: other problem\n");
+    pbuf_free(ptr);
+  }
+
+  return len;
 }
 
 #endif /* LWIP_TCP && LWIP_CALLBACK_API */

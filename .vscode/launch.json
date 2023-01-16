@@ -27,6 +27,7 @@
                 "target/stm32f4x.cfg"
             ],
             "request" : "attach",   // launch or attach, attach can be handy if your code has hung
+            "preLaunchTask": "build-debug",
             // "gdbPath" : "/usr/bin/gdb-multiarch",
             // "armToolchainPath": "/home/han/gcc-arm-none-eabi-10.3-2021.10/bin/",
         },

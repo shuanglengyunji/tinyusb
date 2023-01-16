@@ -32,4 +32,23 @@
 
 void tcpecho_raw_init(void);
 
+/**
+ * Copy (part of) the contents of the received pbuf chain
+ * to an application supplied buffer.
+ *
+ * @param dataptr the application supplied buffer
+ * @param len length of the application supplied buffer
+ * @return the number of bytes copied, or 0 on failure
+ */
+uint16_t tcpecho_read(void* dataptr, uint16_t len);
+
+/**
+ * Send data out of the application supplied buffer
+ *
+ * @param dataptr the application supplied buffer
+ * @param len length of data in the application supplied buffer
+ * @return the number of bytes sent, or 0 on failure
+ */
+uint16_t tcpecho_write(const void* dataptr, uint16_t len);
+
 #endif /* LWIP_TCPECHO_RAW_H */

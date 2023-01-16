@@ -54,6 +54,11 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #include "httpd.h"
 #include "tcpecho_raw.h"
 
+extern int main_uart_write(void const * buf, int len);
+
+uint8_t uart_rx_buf[1500];
+uint8_t uart_tx_buf[1500];
+
 #define INIT_IP4(a,b,c,d) { PP_HTONL(LWIP_MAKEU32(a,b,c,d)) }
 
 /* lwip context */
@@ -230,8 +235,18 @@ int main(void)
 
   while (1)
   {
+    u16_t len;
+
     tud_task();
     service_traffic();
+
+    len = tcpecho_read(uart_tx_buf, 1500);
+    if (len > 0) {
+      main_uart_write(uart_tx_buf, len);
+    }
+    
+    // char str[] = "test data\n";
+    // tcpecho_write(str, sizeof(str));
   }
 
   return 0;
