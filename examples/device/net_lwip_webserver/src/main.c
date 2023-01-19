@@ -54,6 +54,7 @@ try changing the first byte of tud_network_mac_address[] below from 0x02 to 0x00
 #include "httpd.h"
 #include "tcpecho_raw.h"
 
+extern int main_uart_ready(void);
 extern int main_uart_write(void const * buf, int len);
 
 uint8_t uart_rx_buf[1500];
@@ -240,6 +241,7 @@ int main(void)
     tud_task();
     service_traffic();
 
+    while (!main_uart_ready()) {}
     len = tcpecho_read(uart_tx_buf, 1500);
     if (len > 0) {
       main_uart_write(uart_tx_buf, len);

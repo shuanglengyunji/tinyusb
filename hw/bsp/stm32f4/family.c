@@ -46,6 +46,20 @@ void OTG_HS_IRQHandler(void)
 //--------------------------------------------------------------------+
 UART_HandleTypeDef UartHandle;
 UART_HandleTypeDef MainUartHandle;
+DMA_HandleTypeDef hdma_usart1_tx;
+
+void DMA2_Stream7_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(&hdma_usart1_tx);
+}
+
+/**
+  * @brief This function handles USART1 global interrupt.
+  */
+void USART1_IRQHandler(void)
+{
+  HAL_UART_IRQHandler(&MainUartHandle);
+}
 
 void board_init(void)
 {
@@ -121,8 +135,29 @@ void board_init(void)
   };
   HAL_UART_Init(&MainUartHandle);
 
-  /* Configure USB FS GPIOs */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
+  /* DMA interrupt init */
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
+
+  /* USART1_TX Init */
+  hdma_usart1_tx.Instance = DMA2_Stream7;
+  hdma_usart1_tx.Init.Channel = DMA_CHANNEL_4;
+  hdma_usart1_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+  hdma_usart1_tx.Init.PeriphInc = DMA_PINC_DISABLE;
+  hdma_usart1_tx.Init.MemInc = DMA_MINC_ENABLE;
+  hdma_usart1_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+  hdma_usart1_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+  hdma_usart1_tx.Init.Mode = DMA_NORMAL;
+  hdma_usart1_tx.Init.Priority = DMA_PRIORITY_HIGH;
+  hdma_usart1_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+  HAL_DMA_Init(&hdma_usart1_tx);
+
+  __HAL_LINKDMA(&MainUartHandle,hdmatx,hdma_usart1_tx);
+
+  /* USART1 interrupt Init */
+  HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(USART1_IRQn);
 
   /* Configure USB D+ D- Pins */
   GPIO_InitStruct.Pin = GPIO_PIN_11 | GPIO_PIN_12;
@@ -164,9 +199,14 @@ int board_uart_write(void const * buf, int len)
   return len;
 }
 
+int main_uart_ready(void) 
+{
+  return MainUartHandle.gState == HAL_UART_STATE_READY;
+}
+
 int main_uart_write(void const * buf, int len)
 {
-  HAL_UART_Transmit(&MainUartHandle, (uint8_t*)(uintptr_t) buf, len, 0xffff);
+  HAL_UART_Transmit_DMA(&MainUartHandle, (uint8_t*)(uintptr_t) buf, len);
   return len;
 }
 

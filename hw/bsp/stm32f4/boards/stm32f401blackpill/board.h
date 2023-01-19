@@ -90,6 +90,7 @@ static inline void board_clock_init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_USART1_CLK_ENABLE();
   __HAL_RCC_USART2_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
 }
 
 static inline void board_vbus_sense_init(void)
