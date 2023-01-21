@@ -271,7 +271,6 @@ uint16_t tcpecho_read(void* dataptr, uint16_t len)
 {
   struct pbuf *ptr;
   uint16_t data_len;
-  uint16_t copied_len;
 
   if (active == NULL) {
     /* no active tcp connection */
@@ -283,18 +282,20 @@ uint16_t tcpecho_read(void* dataptr, uint16_t len)
     /* receive chain empty, no data to read*/
     return 0;
   }
-  // TODO: handle ptr->next != NULL 
-  // we are only able to copy one pbuf for the moment
+
+  // FIXME: We assume dataptr len >= ptr->tot_len, which may be breached
+  // FIXME: returned value of pbuf_copy_partial larger than data_len
+  //        ptr->next is set to pbuf_pool base by something unknown
+  //        while it is NULL in the recv func
   data_len = ptr->tot_len;
-  copied_len = len >= data_len ? data_len : len;
-  memcpy(dataptr, ptr->payload, data_len);
+  pbuf_copy_partial(ptr, dataptr, len, 0);
   pbuf_free(ptr);
   active->rx = NULL;
 
   /* now we can receive more data */
   tcp_recved(active->pcb, data_len);
   
-  return copied_len;
+  return data_len;
 }
 
 uint16_t tcpecho_write(const void* dataptr, uint16_t len)
